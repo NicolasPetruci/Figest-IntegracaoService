@@ -19,6 +19,4 @@ func main() {
 	app.Listen(":3005")
 }
 
-// Refatorado para melhor legibilidade
 
-// Ajustes de performance na inicialização
