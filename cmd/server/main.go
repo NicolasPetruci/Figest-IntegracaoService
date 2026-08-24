@@ -18,3 +18,5 @@ func main() {
 	log.Println("Starting server on port 3005...")
 	app.Listen(":3005")
 }
+
+// Refatorado para melhor legibilidade
