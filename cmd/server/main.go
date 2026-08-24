@@ -20,3 +20,5 @@ func main() {
 }
 
 // Refatorado para melhor legibilidade
+
+// Ajustes de performance na inicialização
