@@ -6,7 +6,7 @@ import (
 )
 
 func RegisterRoutes(app *fiber.App) {
-	app.Get(/health, handlers.HealthCheck)
+	app.Get("/health", handlers.HealthCheck)
 	
 	importGroup := app.Group("/import")
 	importGroup.Post("/ofx", handlers.ImportOFX)
