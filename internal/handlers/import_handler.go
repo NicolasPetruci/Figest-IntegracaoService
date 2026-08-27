@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/NicolasPetruci/Figest-IntegracaoService/internal/database"
@@ -131,6 +132,14 @@ func GetImportHistory(c *fiber.Ctx) error {
 	var logs []models.ImportLog
 	if database.DB != nil {
 		database.DB.Where("user_id = ?", userID).Order("created_at desc").Find(&logs)
+
+		// Fix legacy logs without batchId
+		for i := range logs {
+			if logs[i].BatchID == "" {
+				logs[i].BatchID = fmt.Sprintf("ofx-batch-legacy-%d", logs[i].ID)
+				database.DB.Model(&logs[i]).Update("batch_id", logs[i].BatchID)
+			}
+		}
 	}
 
 	return c.JSON(logs)
@@ -152,9 +161,11 @@ func UpdateImportBatch(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid body"})
 	}
 
+	logID, _ := strconv.Atoi(batchID)
+
 	if database.DB != nil {
 		database.DB.Model(&models.ImportLog{}).
-			Where("batch_id = ? AND user_id = ?", batchID, userID).
+			Where("(batch_id = ? OR id = ?) AND user_id = ?", batchID, logID, userID).
 			Updates(map[string]interface{}{
 				"account_id": body.AccountID,
 				"subtag":     body.Subtag,
