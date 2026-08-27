@@ -12,6 +12,7 @@ func RegisterRoutes(app *fiber.App) {
 	importGroup.Post("/ofx", handlers.ImportOFX)
 	importGroup.Post("/csv", handlers.ImportCSV)
 	importGroup.Get("/history", handlers.GetImportHistory)
+	importGroup.Patch("/history/:batchId", handlers.UpdateImportBatch)
 	importGroup.Get("/:id/status", handlers.GetImportStatus)
 
 	pluggyGroup := app.Group("/pluggy")

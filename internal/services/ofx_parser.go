@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type OFXTransaction struct {
@@ -12,27 +13,43 @@ type OFXTransaction struct {
 	Description string  `json:"description"`
 }
 
+func FormatOFXDate(rawDate string) string {
+	rawDate = strings.TrimSpace(rawDate)
+	if len(rawDate) >= 8 {
+		year := rawDate[0:4]
+		month := rawDate[4:6]
+		day := rawDate[6:8]
+		return year + "-" + month + "-" + day + "T12:00:00Z"
+	}
+	return time.Now().Format(time.RFC3339)
+}
+
 func ParseOFX(content string) ([]OFXTransaction, error) {
 	var transactions []OFXTransaction
 
-	stmttrnRegex := regexp.MustCompile(`(?is)<STMTTRN>(.*?)</STMTTRN>`)
-	trnamtRegex := regexp.MustCompile(`(?i)<TRNAMT>([^<\r\n]+)`)
-	dtpostRegex := regexp.MustCompile(`(?i)<DTPOST>([^<\r\n]+)`)
-	memoRegex := regexp.MustCompile(`(?i)<MEMO>([^<\r\n]+)`)
-	nameRegex := regexp.MustCompile(`(?i)<NAME>([^<\r\n]+)`)
+	// Split content by <STMTTRN> (case insensitive) to handle both SGML (OFX 1.x) and XML (OFX 2.x)
+	blocks := regexp.MustCompile(`(?i)<STMTTRN>`).Split(content, -1)
+	if len(blocks) <= 1 {
+		return transactions, nil
+	}
 
-	matches := stmttrnRegex.FindAllStringSubmatch(content, -1)
-	for _, match := range matches {
-		if len(match) < 2 {
-			continue
+	trnamtRegex := regexp.MustCompile(`(?i)<TRNAMT>\s*([-\d.,]+)`)
+	dtpostRegex := regexp.MustCompile(`(?i)<DTPOST(?:ED)?>\s*(\d{8})`)
+	memoRegex := regexp.MustCompile(`(?i)<MEMO>\s*([^<\r\n]+)`)
+	nameRegex := regexp.MustCompile(`(?i)<NAME>\s*([^<\r\n]+)`)
+
+	for i := 1; i < len(blocks); i++ {
+		block := blocks[i]
+		if idx := strings.Index(strings.ToUpper(block), "</BANKTRANLIST>"); idx != -1 {
+			block = block[:idx]
 		}
-		block := match[1]
 
 		var tx OFXTransaction
 
 		amtMatch := trnamtRegex.FindStringSubmatch(block)
 		if len(amtMatch) >= 2 {
 			amtStr := strings.TrimSpace(amtMatch[1])
+			amtStr = strings.ReplaceAll(amtStr, ",", ".")
 			amt, _ := strconv.ParseFloat(amtStr, 64)
 			tx.Amount = amt
 		}
@@ -42,15 +59,19 @@ func ParseOFX(content string) ([]OFXTransaction, error) {
 			tx.Date = strings.TrimSpace(dtMatch[1])
 		}
 
-		memoMatch := memoRegex.FindStringSubmatch(block)
 		nameMatch := nameRegex.FindStringSubmatch(block)
-		if len(nameMatch) >= 2 {
+		memoMatch := memoRegex.FindStringSubmatch(block)
+		if len(nameMatch) >= 2 && strings.TrimSpace(nameMatch[1]) != "" {
 			tx.Description = strings.TrimSpace(nameMatch[1])
-		} else if len(memoMatch) >= 2 {
+		} else if len(memoMatch) >= 2 && strings.TrimSpace(memoMatch[1]) != "" {
 			tx.Description = strings.TrimSpace(memoMatch[1])
+		} else {
+			tx.Description = "Lançamento OFX"
 		}
 
-		transactions = append(transactions, tx)
+		if tx.Amount != 0 || tx.Date != "" {
+			transactions = append(transactions, tx)
+		}
 	}
 
 	return transactions, nil

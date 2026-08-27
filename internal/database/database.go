@@ -2,24 +2,30 @@ package database
 
 import (
 	"log"
+	"os"
+
+	"github.com/NicolasPetruci/Figest-IntegracaoService/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"github.com/NicolasPetruci/Figest-IntegracaoService/internal/models"
 )
 
 var DB *gorm.DB
 
 func ConnectDB() {
-	dsn := "host=localhost user=gorm password=gorm dbname=gorm port=5432 sslmode=disable TimeZone=UTC"
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "host=db user=figest password=password dbname=figestdb port=5432 sslmode=disable TimeZone=UTC"
+	}
+
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Println("Failed to connect to database")
+		log.Printf("Failed to connect to database: %v", err)
 		return
 	}
 	DB = db
-	
+
 	err = db.AutoMigrate(&models.ImportLog{})
 	if err != nil {
-		log.Println("Migration failed")
+		log.Printf("Migration failed: %v", err)
 	}
 }
